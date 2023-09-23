@@ -7,6 +7,7 @@ import (
 	"os"
 	"regexp"
 	"strings"
+	"time"
 
 	"github.com/google/go-github/v55/github"
 	"golang.org/x/oauth2"
@@ -22,7 +23,12 @@ func main() {
 
 	repos, err := getRepositories(client, username)
 	if err != nil {
-		log.Fatalf("Error getting repositories: %v", err)
+		if e, ok := err.(*github.RateLimitError); ok {
+			resetTime := e.Rate.Reset.Time
+			sleepTime := time.Until(resetTime)
+			log.Printf("Rate limit exceeded. Try again in: %s\n", sleepTime)
+
+		}
 	}
 
 	for _, repo := range repos {
@@ -104,7 +110,13 @@ func getDockerfileContent(client *github.Client, repoFullName string, username s
 
 			fileContent, _, _, err := client.Repositories.GetContents(ctx, username, repoFullName, DockerfileName, nil)
 			if err != nil {
-
+				if e, ok := err.(*github.RateLimitError); ok {
+					resetTime := e.Rate.Reset.Time
+					sleepTime := time.Until(resetTime)
+					log.Printf("Rate limit exceeded. Waiting for %s...\n", sleepTime)
+					time.Sleep(sleepTime)
+					continue
+				}
 			}
 
 			decodedContent, err := fileContent.GetContent()

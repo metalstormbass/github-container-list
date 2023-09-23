@@ -174,11 +174,13 @@ func findFROMLine(content string) []string {
 	var FROMline []string
 
 	// Regular expression to match "FROM" lines and capture the container name
-	regex := regexp.MustCompile(`\b([a-zA-Z0-9\-._]+:[a-zA-Z0-9\-._]+)\b`)
+	regex := regexp.MustCompile(`\b([a-zA-Z0-9\-._]+(:[a-zA-Z0-9\-._]+)?(/[a-zA-Z0-9\-._]+(:[a-zA-Z0-9\-._]+)?)?)\b`)
 
 	for _, line := range lines {
 
 		if strings.HasPrefix(strings.TrimSpace(line), "FROM ") {
+
+			line = strings.TrimPrefix(line, "FROM ")
 			// Find matches in the line using the regular expression
 			matches := regex.FindStringSubmatch(line)
 

@@ -15,6 +15,8 @@ import (
 func main() {
 	username := os.Args[1]
 	token := os.Getenv("GITHUB_TOKEN")
+	ref := os.Args[2]
+	recursionOption := os.Args[3]
 
 	client := createGitHubClient(token)
 
@@ -25,7 +27,7 @@ func main() {
 
 	for _, repo := range repos {
 
-		getDockerfileContent(client, repo.GetName(), username)
+		getDockerfileContent(client, repo.GetName(), username, recursionOption, ref)
 
 	}
 
@@ -69,40 +71,40 @@ func getRepositories(client *github.Client, username string) ([]*github.Reposito
 	return allRepos, nil
 }
 
-func getDockerfileContent(client *github.Client, repoFullName string, username string) {
+func getDockerfileContent(client *github.Client, repoFullName string, username string, recursionOption string, ref string) {
 	ctx := context.Background()
 
-	DockerfileNames := getDockerfileName(client, repoFullName, username)
-	//var dockerfileContent []string
+	path := ""
+	DockerfileNames := getDockerfileName(client, repoFullName, username, path, recursionOption, ref)
 
-	for _, DockerfileName := range DockerfileNames {
+	if len(DockerfileNames) != 0 {
 
-		fileContent, _, _, err := client.Repositories.GetContents(ctx, username, repoFullName, DockerfileName, nil)
-		if err != nil {
+		for _, DockerfileName := range DockerfileNames {
 
-		}
+			fileContent, _, _, err := client.Repositories.GetContents(ctx, username, repoFullName, DockerfileName, nil)
+			if err != nil {
 
-		decodedContent, err := fileContent.GetContent()
-		if err != nil {
+			}
 
-		}
+			decodedContent, err := fileContent.GetContent()
+			if err != nil {
 
-		//dockerfileContent = append(dockerfileContent, decodedContent)
+			}
 
-		container := findFROMLine(decodedContent)
+			container := findFROMLine(decodedContent)
 
-		for containerName := range container {
+			for containerName := range container {
 
-			fmt.Println(container[containerName])
+				fmt.Println(container[containerName])
+			}
 		}
 	}
-
 	return
 }
 
-func getDockerfileName(client *github.Client, repoFullName string, username string) []string {
+func getDockerfileName(client *github.Client, repoFullName string, username string, path string, recursionOption string, ref string) []string {
 	ctx := context.Background()
-	ref := os.Args[2]
+
 	// Define the regular expression pattern to match Dockerfile variations
 	pattern := `^(Dockerfile|.*\.Dockerfile|Dockerfile\..*)$`
 
@@ -113,30 +115,36 @@ func getDockerfileName(client *github.Client, repoFullName string, username stri
 		return nil
 	}
 
-	// Recursively fetch the contents of the root directory
-	_, rootContents, _, err := client.Repositories.GetContents(ctx, username, repoFullName, "", &github.RepositoryContentGetOptions{Ref: ref})
-
-	// Iterate through the root directory contents
-	var files []string
-	for _, content := range rootContents {
-		if *content.Type == "file" {
-			files = append(files, string(*content.Name))
-		} else if *content.Type == "dir" {
-			// You can add recursion here to list contents of subdirectories
-		}
+	// Recursively fetch the contents of the specified directory
+	_, rootContents, _, err := client.Repositories.GetContents(ctx, username, repoFullName, path, &github.RepositoryContentGetOptions{Ref: ref})
+	if err != nil {
+		// Handle error
+		return nil
 	}
 
 	// Initialize a slice to hold matching Dockerfile names
 	var DockerfileNames []string
 
-	// Iterate through the files to find matching Dockerfile names
-	for _, file := range files {
-		if regex.MatchString(file) {
-
-			DockerfileNames = append(DockerfileNames, file)
-
+	// Iterate through the directory contents
+	for _, content := range rootContents {
+		if *content.Type == "file" {
+			fileName := string(*content.Name)
+			if regex.MatchString(fileName) {
+				// Construct the full path for the matching Dockerfile
+				filePath := fileName
+				if path != "" {
+					filePath = path + "/" + fileName
+				}
+				DockerfileNames = append(DockerfileNames, filePath)
+			}
+		} else if *content.Type == "dir" && recursionOption == "true" {
+			// Recursively call the function for subdirectories
+			subDirPath := path + "/" + string(*content.Name)
+			subDirDockerfiles := getDockerfileName(client, repoFullName, username, subDirPath, recursionOption, ref)
+			DockerfileNames = append(DockerfileNames, subDirDockerfiles...)
 		}
 	}
+
 	return DockerfileNames
 }
 

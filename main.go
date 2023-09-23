@@ -16,6 +16,11 @@ import (
 func main() {
 	username := os.Args[1]
 	token := os.Getenv("GITHUB_TOKEN")
+	if token == "" {
+		fmt.Println("Set GITHUB_TOKEN environment variable")
+		os.Exit(1)
+	}
+
 	ref := os.Args[2]
 	recursionOption := os.Args[3]
 
@@ -110,6 +115,7 @@ func getDockerfileContent(client *github.Client, repoFullName string, username s
 
 			fileContent, _, _, err := client.Repositories.GetContents(ctx, username, repoFullName, DockerfileName, nil)
 			if err != nil {
+				log.Println(err)
 				if e, ok := err.(*github.RateLimitError); ok {
 					resetTime := e.Rate.Reset.Time
 					sleepTime := time.Until(resetTime)
@@ -186,7 +192,7 @@ func findFROMLine(content string) []string {
 	var FROMline []string
 
 	// Regular expression to match "FROM" lines and capture the container name
-	regex := regexp.MustCompile(`\b([a-zA-Z0-9\-._]+(:[a-zA-Z0-9\-._]+)?(/[a-zA-Z0-9\-._]+(:[a-zA-Z0-9\-._]+)?)?)\b`)
+	regex := regexp.MustCompile(`\b([a-zA-Z0-9\-.:/]+)\b`)
 
 	for _, line := range lines {
 

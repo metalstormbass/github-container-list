@@ -23,20 +23,12 @@ func main() {
 		log.Fatalf("Error getting repositories: %v", err)
 	}
 
-	var containerList []string
-
 	for _, repo := range repos {
 
-		dockerfileContent := getDockerfileContent(client, repo.GetName(), username)
-		if err != nil {
-			continue
-		}
-		for containers := range dockerfileContent {
-			containerList = append(containerList, dockerfileContent[containers])
-		}
+		getDockerfileContent(client, repo.GetName(), username)
+
 	}
 
-	fmt.Print(containerList)
 }
 
 func createGitHubClient(token string) *github.Client {
@@ -77,13 +69,11 @@ func getRepositories(client *github.Client, username string) ([]*github.Reposito
 	return allRepos, nil
 }
 
-func getDockerfileContent(client *github.Client, repoFullName string, username string) []string {
+func getDockerfileContent(client *github.Client, repoFullName string, username string) {
 	ctx := context.Background()
 
 	DockerfileNames := getDockerfileName(client, repoFullName, username)
-	var dockerfileContent []string
-
-	var containers []string
+	//var dockerfileContent []string
 
 	for _, DockerfileName := range DockerfileNames {
 
@@ -96,16 +86,18 @@ func getDockerfileContent(client *github.Client, repoFullName string, username s
 		if err != nil {
 
 		}
-		dockerfileContent = append(dockerfileContent, decodedContent)
+
+		//dockerfileContent = append(dockerfileContent, decodedContent)
 
 		container := findFROMLine(decodedContent)
 
 		for containerName := range container {
-			containers = append(containers, container[containerName])
+
+			fmt.Println(container[containerName])
 		}
 	}
 
-	return containers
+	return
 }
 
 func getDockerfileName(client *github.Client, repoFullName string, username string) []string {
@@ -153,16 +145,19 @@ func findFROMLine(content string) []string {
 	var FROMline []string
 
 	// Regular expression to match "FROM" lines and capture the container name
-	regex := regexp.MustCompile(`\bFROM\s+([^ \t\n\r]+)(?:\s+AS\s+[^ \t\n\r]+)?`)
+	regex := regexp.MustCompile(`\b([a-zA-Z0-9\-._]+:[a-zA-Z0-9\-._]+)\b`)
 
 	for _, line := range lines {
-		// Find matches in the line using the regular expression
-		matches := regex.FindStringSubmatch(line)
 
-		if len(matches) > 1 {
-			// Extract the container name (group 1 in the regex match)
-			containerName := matches[1]
-			FROMline = append(FROMline, containerName)
+		if strings.HasPrefix(strings.TrimSpace(line), "FROM ") {
+			// Find matches in the line using the regular expression
+			matches := regex.FindStringSubmatch(line)
+
+			if len(matches) > 1 {
+				// Extract the container name (group 1 in the regex match)
+				containerName := matches[1]
+				FROMline = append(FROMline, containerName)
+			}
 		}
 	}
 

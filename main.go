@@ -27,7 +27,14 @@ func main() {
 
 	for _, repo := range repos {
 
-		getDockerfileContent(client, repo.GetName(), username, recursionOption, ref)
+		hasDockerfile, err := hasDockerfiles(client, username, repo.GetName())
+		if err != nil {
+			log.Fatalf("Error checking for Dockerfiles: %v", err)
+		}
+
+		if hasDockerfile {
+			getDockerfileContent(client, repo.GetName(), username, recursionOption, ref)
+		}
 
 	}
 
@@ -69,6 +76,20 @@ func getRepositories(client *github.Client, username string) ([]*github.Reposito
 	}
 
 	return allRepos, nil
+}
+
+func hasDockerfiles(client *github.Client, username, repo string) (bool, error) {
+	ctx := context.Background()
+
+	// Retrieve the repository's languages
+	languages, _, err := client.Repositories.ListLanguages(ctx, username, repo)
+	if err != nil {
+		return false, err
+	}
+
+	// Check if "Dockerfile" language is present
+	_, ok := languages["Dockerfile"]
+	return ok, nil
 }
 
 func getDockerfileContent(client *github.Client, repoFullName string, username string, recursionOption string, ref string) {

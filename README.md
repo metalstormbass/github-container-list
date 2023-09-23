@@ -6,6 +6,7 @@ This script will crawl a Github Account or Organization and extract all of the c
 
 <b> This will probably hit the Github rate limit </B>
 
+This code is half written by chat GPT. It is 100% gross.
 
 ## Usage
 

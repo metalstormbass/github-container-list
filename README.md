@@ -2,7 +2,10 @@
 
 This script will crawl a Github Account or Organization and extract all of the container image names.
 
-<b> This will probably exceed the rate limit </B>
+## Disclaimer
+
+<b> This will probably hit the Github rate limit </B>
+
 
 ## Usage
 
@@ -19,3 +22,4 @@ go run main.go <ORG_NAME> <BRANCH_NAME> <RECURSION_TRUE_OR_FALSE>
 go run main.go metalstormbass main false  > out.txt
 cat out.txt | sort | uniq
 ```
+

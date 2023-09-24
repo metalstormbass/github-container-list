@@ -38,6 +38,10 @@ func main() {
 	var recursionOption string
 	if len(os.Args) > 3 {
 		recursionOption = os.Args[3]
+		if recursionOption != "true" && recursionOption != "false" {
+			fmt.Println("Enter true or false as values for recursion")
+			os.Exit(1)
+		}
 	} else {
 		recursionOption = "false"
 	}
@@ -260,14 +264,14 @@ func findFROMLine(content string) []string {
 }
 
 // Function to handle hitting rate limit
-func handleRateLimit(err error, repoFullName string, x int) bool {
+func handleRateLimit(err error, repoFullName string, iteration int) {
 	log.Println(err)
 	if e, ok := err.(*github.RateLimitError); ok {
 		resetTime := e.Rate.Reset.Time
 		sleepTime := time.Until(resetTime)
 		log.Printf("Rate limit exceeded at %s. Try again in %s...\n", resetTime, sleepTime)
-		log.Printf("When rate limit resets, try again from iteration %d. This is repo:  %s...\n", x, repoFullName)
-		return true
+		log.Printf("When rate limit resets, try again from iteration %d. This is repo:  %s\n", iteration, repoFullName)
+		os.Exit(0)
 	}
-	return false
+
 }

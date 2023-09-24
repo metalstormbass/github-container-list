@@ -4,7 +4,7 @@ This script will crawl a Github Account or Organization and extract all of the b
 
 ## Disclaimer
 
-<b> This will probably hit the Github rate limit - It will handle it gracefully and wait to continue. However, it could lock down your account for quite some time</b>
+<b> Script will probably hit the Github rate limit</b>
 
 This code is 50% written by chatGPT but is 100% gross.
 

@@ -12,13 +12,15 @@ This code is 50% written by chatGPT but is 100% gross.
 
 This script requires you to set ```GITHUB_TOKEN``` environment variable.
 
-It accepts three arguments:
+It accepts four arguments:
 
 ```
-go run main.go <ORG_NAME> <BRANCH_NAME> <RECURSION_TRUE_OR_FALSE> <ITERATION>
+go run main.go <ORG_NAME> <BRANCH_NAME> <RECURSION_TRUE_OR_FALSE> <ITERATION_NUMBER>
 ```
 
 If you have Dockerfiles in nested folders, set the recursion argument to '''true'''. Keep in mind that this will increase the API calls and hit the rate limit sooner.
+
+If you want to set the iteration, you must also define the recursion setting.
 
 <b> Suggested Usage: </B>
 

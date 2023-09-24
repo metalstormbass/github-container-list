@@ -1,6 +1,6 @@
 # github-container-list
 
-This script will crawl a Github Account or Organization and extract all of the container image names.
+This script will crawl a Github Account or Organization and extract all of the base image names.
 
 ## Disclaimer
 

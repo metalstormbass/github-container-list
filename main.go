@@ -71,13 +71,12 @@ func main() {
 	}
 
 	// Loop through repos to search for Dockerfiles
-	for x, _ := range repos {
-
+	for range repos {
 		for {
 			// Check to see if a repo contains any Dockerfiles
 			hasDockerfile, err := hasDockerfiles(client, username, repos[iteration].GetName())
 			if err != nil {
-				handleRateLimit(err, repos[iteration].GetName(), x)
+				handleRateLimit(err, repos[iteration].GetName(), iteration)
 			}
 
 			// Parse any found Dockerfiles
@@ -163,27 +162,33 @@ func getDockerfileContent(client *github.Client, repoFullName string, username s
 	if len(DockerfileNames) != 0 {
 
 		for _, DockerfileName := range DockerfileNames {
-
+			// Retrieve the repository file content
 			fileContent, _, _, err := client.Repositories.GetContents(ctx, username, repoFullName, DockerfileName, nil)
 			if err != nil {
 				log.Println(err)
+				continue // Skip this file and move to the next one
+			}
+
+			// Check if content is nil
+			if fileContent == nil {
+				log.Printf("Content is nil for file %s in repo %s\n", DockerfileName, repoFullName)
+				continue // Skip this file and move to the next one
 			}
 
 			decodedContent, err := fileContent.GetContent()
 			if err != nil {
 				log.Println(err)
+				continue // Skip this file and move to the next one
 			}
 
 			// Find Base image name
 			container := findFROMLine(decodedContent)
 
 			for containerName := range container {
-
 				fmt.Println(container[containerName])
 			}
 		}
 	}
-
 }
 
 // Function to get modified Dockerfile names

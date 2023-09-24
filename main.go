@@ -275,7 +275,7 @@ func handleRateLimit(err error, repoFullName string, iteration int) {
 		resetTime := e.Rate.Reset.Time
 		sleepTime := time.Until(resetTime)
 		log.Printf("Rate limit exceeded at %s. Try again in %s...\n", resetTime, sleepTime)
-		log.Printf("When rate limit resets, try again from iteration %d. This is repo:  %s\n", iteration, repoFullName)
+		log.Printf("When rate limit resets, restart from iteration %d. Repo to be scanned: %s\n", iteration, repoFullName)
 		os.Exit(0)
 	}
 

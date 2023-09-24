@@ -39,6 +39,6 @@ cat out.txt | sort | uniq
 
 Continuiing after hitting rate limit:
 ```
-go run main.go metalstormbass main true 160 > out.txt
+go run main.go metalstormbass main true 160 >> out.txt
 cat out.txt | sort | uniq
 ```

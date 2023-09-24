@@ -6,6 +6,7 @@ import (
 	"log"
 	"os"
 	"regexp"
+	"strconv"
 	"strings"
 	"time"
 
@@ -14,43 +15,83 @@ import (
 )
 
 func main() {
-	username := os.Args[1]
-	token := os.Getenv("GITHUB_TOKEN")
-	if token == "" {
-		fmt.Println("Set GITHUB_TOKEN environment variable")
+	// Check the number of command-line arguments
+	if len(os.Args) < 3 {
+		fmt.Println("Usage: program_name username branch [recursionOption] [iteration]")
 		os.Exit(1)
 	}
 
+	// Username or Org
+	username := os.Args[1]
+
+	// Branch
 	ref := os.Args[2]
-	recursionOption := os.Args[3]
-
-	client := createGitHubClient(token)
-
-	repos, err := getRepositories(client, username)
-	if err != nil {
-		if e, ok := err.(*github.RateLimitError); ok {
-			resetTime := e.Rate.Reset.Time
-			sleepTime := time.Until(resetTime)
-			log.Printf("Rate limit exceeded. Try again in: %s\n", sleepTime)
-
-		}
+	if ref == "" {
+		fmt.Println("Please specify a branch")
+		os.Exit(1)
 	}
 
-	for _, repo := range repos {
+	// Github Token (optional)
+	token := os.Getenv("GITHUB_TOKEN")
 
-		hasDockerfile, err := hasDockerfiles(client, username, repo.GetName())
-		if err != nil {
-			log.Fatalf("Error checking for Dockerfiles: %v", err)
-		}
+	// Recursion Option (optional)
+	var recursionOption string
+	if len(os.Args) > 3 {
+		recursionOption = os.Args[3]
+	} else {
+		recursionOption = "false"
+	}
 
-		if hasDockerfile {
-			getDockerfileContent(client, repo.GetName(), username, recursionOption, ref)
+	// Iteration, for continuation after hitting rate limit (optional)
+	var iterationStr string
+	if len(os.Args) > 4 {
+		iterationStr = os.Args[4]
+	} else {
+		iterationStr = "0"
+	}
+
+	// Convert Iteration to Integer
+	iteration, err := strconv.Atoi(iterationStr)
+	if err != nil {
+		fmt.Println("Invalid iteration value:", err)
+		os.Exit(1)
+	}
+
+	// Create Github Client
+	client := createGitHubClient(token)
+
+	// Get List of Repos
+	repos, err := getRepositories(client, username)
+	if err != nil {
+		log.Println(err)
+	}
+
+	// Loop through repos to search for Dockerfiles
+	for x, _ := range repos {
+
+		for {
+			// Check to see if a repo contains any Dockerfiles
+			hasDockerfile, err := hasDockerfiles(client, username, repos[iteration].GetName())
+			if err != nil {
+				handleRateLimit(err, repos[iteration].GetName(), x)
+			}
+
+			// Parse any found Dockerfiles
+			if hasDockerfile {
+				getDockerfileContent(client, repos[iteration].GetName(), username, recursionOption, ref)
+			}
+			iteration++
+			if iteration >= len(repos) {
+				log.Println("Complete")
+				os.Exit(0)
+			}
 		}
 
 	}
 
 }
 
+// Function to create Github Client
 func createGitHubClient(token string) *github.Client {
 	ctx := context.Background()
 	ts := oauth2.StaticTokenSource(
@@ -61,6 +102,7 @@ func createGitHubClient(token string) *github.Client {
 	return github.NewClient(tc)
 }
 
+// Function to get repos
 func getRepositories(client *github.Client, username string) ([]*github.Repository, error) {
 	ctx := context.Background()
 	opt := &github.RepositoryListOptions{
@@ -89,6 +131,7 @@ func getRepositories(client *github.Client, username string) ([]*github.Reposito
 	return allRepos, nil
 }
 
+// Function to check if repo has Dockefiles
 func hasDockerfiles(client *github.Client, username, repo string) (bool, error) {
 	ctx := context.Background()
 
@@ -103,12 +146,16 @@ func hasDockerfiles(client *github.Client, username, repo string) (bool, error) 
 	return ok, nil
 }
 
+// Function to parse Dockerfiles
 func getDockerfileContent(client *github.Client, repoFullName string, username string, recursionOption string, ref string) {
 	ctx := context.Background()
 
 	path := ""
+
+	// Get Dockerfiles with modified names
 	DockerfileNames := getDockerfileName(client, repoFullName, username, path, recursionOption, ref)
 
+	// Parse Dockerfiles
 	if len(DockerfileNames) != 0 {
 
 		for _, DockerfileName := range DockerfileNames {
@@ -116,20 +163,14 @@ func getDockerfileContent(client *github.Client, repoFullName string, username s
 			fileContent, _, _, err := client.Repositories.GetContents(ctx, username, repoFullName, DockerfileName, nil)
 			if err != nil {
 				log.Println(err)
-				if e, ok := err.(*github.RateLimitError); ok {
-					resetTime := e.Rate.Reset.Time
-					sleepTime := time.Until(resetTime)
-					log.Printf("Rate limit exceeded. Waiting for %s...\n", sleepTime)
-					time.Sleep(sleepTime)
-					continue
-				}
 			}
 
 			decodedContent, err := fileContent.GetContent()
 			if err != nil {
-
+				log.Println(err)
 			}
 
+			// Find Base image name
 			container := findFROMLine(decodedContent)
 
 			for containerName := range container {
@@ -138,9 +179,10 @@ func getDockerfileContent(client *github.Client, repoFullName string, username s
 			}
 		}
 	}
-	return
+
 }
 
+// Function to get modified Dockerfile names
 func getDockerfileName(client *github.Client, repoFullName string, username string, path string, recursionOption string, ref string) []string {
 	ctx := context.Background()
 
@@ -187,28 +229,45 @@ func getDockerfileName(client *github.Client, repoFullName string, username stri
 	return DockerfileNames
 }
 
+// Function to extract container name
 func findFROMLine(content string) []string {
 	lines := strings.Split(content, "\n")
 	var FROMline []string
 
-	// Regular expression to match "FROM" lines and capture the container name
-	regex := regexp.MustCompile(`\b([a-zA-Z0-9\-.:/]+)\b`)
+	// Regular expression to match "FROM" lines and capture the container name. Tweak this if necessary
+	regex := regexp.MustCompile(`\b([a-zA-Z0-9\-.:/]+)(:latest)?\b`)
+	regex2 := regexp.MustCompile(`\b(AS\b|platform\b|TARGETARCH\b)`)
 
 	for _, line := range lines {
-
 		if strings.HasPrefix(strings.TrimSpace(line), "FROM ") {
-
 			line = strings.TrimPrefix(line, "FROM ")
-			// Find matches in the line using the regular expression
-			matches := regex.FindStringSubmatch(line)
 
-			if len(matches) > 1 {
-				// Extract the container name (group 1 in the regex match)
-				containerName := matches[1]
-				FROMline = append(FROMline, containerName)
+			// Use regex2 to check if the line matches unwanted terms
+			if !regex2.MatchString(line) {
+				// Find matches in the line using the regular expression
+				matches := regex.FindStringSubmatch(line)
+
+				if len(matches) > 1 {
+					// Extract the container name (group 1 in the regex match)
+					containerName := matches[1]
+					FROMline = append(FROMline, containerName)
+				}
 			}
 		}
 	}
 
 	return FROMline
+}
+
+// Function to handle hitting rate limit
+func handleRateLimit(err error, repoFullName string, x int) bool {
+	log.Println(err)
+	if e, ok := err.(*github.RateLimitError); ok {
+		resetTime := e.Rate.Reset.Time
+		sleepTime := time.Until(resetTime)
+		log.Printf("Rate limit exceeded at %s. Try again in %s...\n", resetTime, sleepTime)
+		log.Printf("When rate limit resets, try again from iteration %d. This is repo:  %s...\n", x, repoFullName)
+		return true
+	}
+	return false
 }

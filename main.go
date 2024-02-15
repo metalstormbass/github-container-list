@@ -83,6 +83,7 @@ func main() {
 			if hasDockerfile {
 				getDockerfileContent(client, repos[iteration].GetName(), username, recursionOption, ref)
 			}
+
 			iteration++
 			if iteration >= len(repos) {
 				log.Println("Complete")
@@ -185,6 +186,7 @@ func getDockerfileContent(client *github.Client, repoFullName string, username s
 			container := findFROMLine(decodedContent)
 
 			for containerName := range container {
+				fmt.Print(repoFullName + ": ")
 				fmt.Println(container[containerName])
 			}
 		}

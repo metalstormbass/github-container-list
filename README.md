@@ -6,8 +6,6 @@ This script will crawl a Github Account or Organization and extract all of the b
 
 <b> Script will probably hit the Github rate limit</b>
 
-This code is 50% written by chatGPT but is 100% gross.
-
 ## Usage
 
 This script requires you to set ```GITHUB_TOKEN``` environment variable.
